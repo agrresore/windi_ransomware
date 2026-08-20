@@ -1,4 +1,7 @@
 # windi_ransomware
+
+![[photo.png]]
+
 # Educational Ransomware Demo
 
 > **WARNING:** This project is for **educational purposes only**.  
