@@ -1,6 +1,7 @@
 # windi_ransomware
 
-![[photo.png]]
+<img width="1920" height="1080" alt="photo" src="https://github.com/user-attachments/assets/9734c2ec-13f3-4c0c-8071-cea48b62f43e" />
+
 
 # Educational Ransomware Demo
 
